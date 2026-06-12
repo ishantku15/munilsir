@@ -330,8 +330,16 @@ async function renderCourseDetail(slug) {
              ${hasDiscount ? `<span class="detail-price-old">₹${courseInfo.originalPrice.toLocaleString('en-IN')}</span>` : ''}`;
       }
 
-      // Render course content/description
-      const contentArea = document.getElementById('contentArea');
+      // Fetch actual course folders from our new original backend proxy
+      try {
+        const foldersRes = await api.get(`folders?course_id=${courseId}&parent_id=-1`);
+        if (foldersRes && foldersRes.data && foldersRes.data.length > 0) {
+          renderFolders(courseId, foldersRes.data);
+          return;
+        }
+      } catch (e) {
+        console.warn('Could not fetch folders from proxy:', e);
+      }
 
       if (data.description || data.course?.description) {
         contentArea.innerHTML = `
@@ -398,22 +406,100 @@ async function renderCourseDetail(slug) {
   }
 }
 
-// ── Render Subjects List ─────────────────────────────────────
-function renderSubjects(subjects) {
-  const area = document.getElementById('contentArea');
-  area.innerHTML = `
-    <h2 style="font-size:22px;font-weight:700;margin-bottom:16px">Subjects</h2>
-    <div class="content-list">
-      ${subjects.map((s, i) => `
-        <div class="content-item" style="animation-delay:${i*50}ms">
-          <div class="content-icon folder">${icons.folder}</div>
-          <span class="content-title">${esc(s.name || s.title || 'Subject')}</span>
-          <span class="content-meta">${icons.chevron}</span>
+// ── Render Dynamic Folders & Videos ──────────────────────────
+function renderFolders(courseId, items, parentEl = null) {
+  const container = parentEl || document.getElementById('contentArea');
+  if (!parentEl) {
+    container.innerHTML = `<h2 style="font-size:22px;font-weight:700;margin-bottom:16px">Course Content</h2><div class="content-list" id="rootFolders"></div>`;
+  }
+  
+  const listEl = parentEl || document.getElementById('rootFolders');
+  
+  const html = items.map((item, i) => {
+    const isFolder = item.type === 0;
+    const isVideo = item.type === 1;
+    const isPdf = item.type === 2;
+    
+    let icon = icons.link;
+    if (isFolder) icon = icons.folder;
+    if (isVideo) icon = icons.video;
+    if (isPdf) icon = icons.pdf;
+
+    // We store data-course and data-id to fetch sub-folders
+    return `
+      <div class="content-item" style="animation-delay:${i*20}ms" 
+           onclick="handleContentClick(this, '${courseId}', '${item.id}', ${item.type}, '${item.url || ''}')">
+        <div class="content-icon ${isFolder ? 'folder' : ''}">${icon}</div>
+        <div class="content-details" style="flex:1">
+          <span class="content-title" style="display:block">${esc(item.name || item.title || 'Untitled')}</span>
+          ${isVideo && item.duration ? `<span class="content-meta" style="font-size:12px;color:#888">${item.duration}</span>` : ''}
         </div>
-      `).join('')}
-    </div>
-  `;
+        <span class="content-meta loader-icon" style="display:none">⌛</span>
+        ${isFolder ? `<span class="content-meta chevron">${icons.chevron}</span>` : ''}
+      </div>
+      <div class="sub-folders" id="sub-${item.id}" style="display:none; padding-left: 20px; border-left: 1px solid #eee; margin-left: 10px;"></div>
+    `;
+  }).join('');
+
+  if (parentEl) {
+    listEl.innerHTML = html;
+  } else {
+    listEl.innerHTML += html;
+  }
 }
+
+window.handleContentClick = async function(el, courseId, itemId, type, url) {
+  if (type === 1 || type === 2) {
+    // It's a video or PDF, open it
+    if (url) {
+      window.open(url, '_blank');
+    } else {
+      alert('Content URL not found. It might be encrypted or live class.');
+    }
+    return;
+  }
+
+  // It's a folder (type 0)
+  const subDiv = document.getElementById(`sub-${itemId}`);
+  const loader = el.querySelector('.loader-icon');
+  const chevron = el.querySelector('.chevron');
+  
+  if (subDiv.style.display === 'block') {
+    subDiv.style.display = 'none'; // Collapse
+    if(chevron) chevron.style.transform = 'rotate(0deg)';
+    return;
+  }
+
+  // Expand
+  if(chevron) chevron.style.transform = 'rotate(90deg)';
+  
+  if (subDiv.innerHTML.trim() === '') {
+    // Fetch sub-contents
+    if(loader) loader.style.display = 'inline-block';
+    if(chevron) chevron.style.display = 'none';
+    
+    try {
+      const res = await api.get(`folders?course_id=${courseId}&parent_id=${itemId}`);
+      if(loader) loader.style.display = 'none';
+      if(chevron) chevron.style.display = 'inline-block';
+      
+      if (res && res.data && res.data.length > 0) {
+        subDiv.style.display = 'block';
+        renderFolders(courseId, res.data, subDiv);
+      } else {
+        subDiv.innerHTML = '<div style="padding:10px;color:#888;font-size:13px">Empty folder</div>';
+        subDiv.style.display = 'block';
+      }
+    } catch (e) {
+      if(loader) loader.style.display = 'none';
+      if(chevron) chevron.style.display = 'inline-block';
+      subDiv.innerHTML = '<div style="padding:10px;color:red;font-size:13px">Failed to load contents</div>';
+      subDiv.style.display = 'block';
+    }
+  } else {
+    subDiv.style.display = 'block';
+  }
+};
 
 // ── Router Handler ───────────────────────────────────────────
 async function handleRoute() {
@@ -458,3 +544,4 @@ window.addEventListener('load', handleRoute);
 
 // Make navigate available globally
 window.navigate = navigate;
+
