@@ -461,19 +461,10 @@ window.handleContentClick = async function(el, courseId, itemId, type, url) {
       const response = await fetch(`/api/video?course_id=${courseId}&video_id=${itemId}`);
       const data = await response.json();
 
-      // Find the best quality HLS/mp4 link or use the secure player token
       let videoUrl = url;
       
-      // The API doesn't wrap the response in a "data" array for this endpoint, it returns an object directly
-      if (data) {
-        if (data.video_player_token) {
-           videoUrl = `https://player.appx.co.in/secure-player?isMobile=true&token=${data.video_player_token}`;
-        } else if (data.download_links && data.download_links.length > 0) {
-           // If they give us direct HLS/MP4 paths, grab the first one (usually highest quality)
-           videoUrl = data.download_links[0].path;
-        } else if (data.hls_link) {
-           videoUrl = data.hls_link;
-        }
+      if (data && data.success && data.url) {
+        videoUrl = data.url;
       }
       
       openMediaModal(videoUrl, type);
@@ -599,17 +590,40 @@ function openMediaModal(url, type) {
   modalTitle.innerText = type === 'VIDEO' ? 'Video Player' : 'Document Viewer';
 
   if (type === 'VIDEO') {
-    // Check if it's an m3u8 or mp4
-    if (url.includes('.m3u8') || url.includes('.mp4')) {
+    // Check if it's an m3u8
+    if (url.includes('.m3u8')) {
+      modalBody.innerHTML = `<video id="appxHlsVideo" controls autoplay style="width:100%; height:100%; border-radius: 8px;"></video>`;
+      
+      const setupHls = () => {
+        const video = document.getElementById('appxHlsVideo');
+        if (Hls.isSupported()) {
+          const hls = new Hls();
+          hls.loadSource(url);
+          hls.attachMedia(video);
+          window.currentHls = hls; // Save reference to destroy later
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          // For Safari
+          video.src = url;
+        }
+      };
+
+      if (!window.Hls) {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1';
+        script.onload = setupHls;
+        document.head.appendChild(script);
+      } else {
+        setupHls();
+      }
+    } else if (url.includes('.mp4')) {
       modalBody.innerHTML = `
         <video controls autoplay style="width:100%; height:100%; border-radius: 8px;">
-          <source src="${url}" type="application/x-mpegURL">
           <source src="${url}" type="video/mp4">
           Your browser does not support the video tag.
         </video>
       `;
     } else {
-      // Fallback to iframe for AppX video player URLs
+      // Fallback to iframe for AppX video player URLs or encrypted links
       modalBody.innerHTML = `<iframe src="${url}" style="width:100%; height:100%; border:none; border-radius: 8px;" allowfullscreen allow="autoplay; encrypted-media"></iframe>`;
     }
   } else {
@@ -624,6 +638,10 @@ window.closeMediaModal = function() {
   const modal = document.getElementById('mediaModal');
   if (modal) {
     modal.style.display = 'none';
+    if (window.currentHls) {
+      window.currentHls.destroy();
+      window.currentHls = null;
+    }
     document.getElementById('modalBody').innerHTML = ''; // clear iframe/video to stop playback
     document.body.style.overflow = 'auto';
   }
