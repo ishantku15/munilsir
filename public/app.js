@@ -463,14 +463,16 @@ window.handleContentClick = async function(el, courseId, itemId, type, url) {
 
       // Find the best quality HLS/mp4 link or use the secure player token
       let videoUrl = url;
-      if (data && data.data && data.data.length > 0) {
-        const videoData = data.data[0];
-        if (videoData.video_player_token) {
-           videoUrl = `https://player.appx.co.in/secure-player?isMobile=true&token=${videoData.video_player_token}`;
-        } else if (videoData.hls_link) {
-           videoUrl = videoData.hls_link;
-        } else if (videoData.url) {
-           videoUrl = videoData.url;
+      
+      // The API doesn't wrap the response in a "data" array for this endpoint, it returns an object directly
+      if (data) {
+        if (data.video_player_token) {
+           videoUrl = `https://player.appx.co.in/secure-player?isMobile=true&token=${data.video_player_token}`;
+        } else if (data.download_links && data.download_links.length > 0) {
+           // If they give us direct HLS/MP4 paths, grab the first one (usually highest quality)
+           videoUrl = data.download_links[0].path;
+        } else if (data.hls_link) {
+           videoUrl = data.hls_link;
         }
       }
       
