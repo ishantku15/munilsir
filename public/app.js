@@ -450,9 +450,8 @@ function renderFolders(courseId, items, parentEl = null) {
 
 window.handleContentClick = async function(el, courseId, itemId, type, url) {
   if (type === 'VIDEO' || type === 'DOCUMENT' || type === 'PDF') {
-    // It's a video or PDF, open it
     if (url) {
-      window.open(url, '_blank');
+      openMediaModal(url, type);
     } else {
       alert('Content URL not found. It might be encrypted or live class.');
     }
@@ -538,10 +537,63 @@ document.getElementById('hamburger')?.addEventListener('click', () => {
   document.getElementById('mobileMenu').classList.toggle('open');
 });
 
-// ── Init ─────────────────────────────────────────────────────
+// ── Media Modal Player ───────────────────────────────────────
+function openMediaModal(url, type) {
+  let modal = document.getElementById('mediaModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'mediaModal';
+    modal.innerHTML = `
+      <div class="modal-overlay" onclick="closeMediaModal()"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modalTitle">Media Player</h3>
+          <button class="modal-close" onclick="closeMediaModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  const modalBody = document.getElementById('modalBody');
+  const modalTitle = document.getElementById('modalTitle');
+  modalTitle.innerText = type === 'VIDEO' ? 'Video Player' : 'Document Viewer';
+
+  if (type === 'VIDEO') {
+    // Check if it's an m3u8 or mp4
+    if (url.includes('.m3u8') || url.includes('.mp4')) {
+      modalBody.innerHTML = `
+        <video controls autoplay style="width:100%; height:100%; border-radius: 8px;">
+          <source src="${url}" type="application/x-mpegURL">
+          <source src="${url}" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>
+      `;
+    } else {
+      // Fallback to iframe for AppX video player URLs
+      modalBody.innerHTML = `<iframe src="${url}" style="width:100%; height:100%; border:none; border-radius: 8px;" allowfullscreen allow="autoplay; encrypted-media"></iframe>`;
+    }
+  } else {
+    modalBody.innerHTML = `<iframe src="${url}" style="width:100%; height:100%; border:none; border-radius: 8px;"></iframe>`;
+  }
+
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden'; // prevent background scrolling
+}
+
+window.closeMediaModal = function() {
+  const modal = document.getElementById('mediaModal');
+  if (modal) {
+    modal.style.display = 'none';
+    document.getElementById('modalBody').innerHTML = ''; // clear iframe/video to stop playback
+    document.body.style.overflow = 'auto';
+  }
+}
+
+// ── App Initialization ─────────────────────────────────────────────────────
 window.addEventListener('hashchange', handleRoute);
 window.addEventListener('load', handleRoute);
 
 // Make navigate available globally
 window.navigate = navigate;
-
