@@ -449,7 +449,43 @@ function renderFolders(courseId, items, parentEl = null) {
 }
 
 window.handleContentClick = async function(el, courseId, itemId, type, url) {
-  if (type === 'VIDEO' || type === 'DOCUMENT' || type === 'PDF') {
+  if (type === 'VIDEO') {
+    const loader = el.querySelector('.loader-icon');
+    const title = el.querySelector('.content-title');
+    
+    // Show loading
+    if (loader) loader.style.display = 'inline-block';
+    if (title) title.style.opacity = '0.5';
+
+    try {
+      const response = await fetch(`/api/video?course_id=${courseId}&video_id=${itemId}`);
+      const data = await response.json();
+
+      // Find the best quality HLS/mp4 link or use the secure player token
+      let videoUrl = url;
+      if (data && data.data && data.data.length > 0) {
+        const videoData = data.data[0];
+        if (videoData.video_player_token) {
+           videoUrl = `https://player.appx.co.in/secure-player?isMobile=true&token=${videoData.video_player_token}`;
+        } else if (videoData.hls_link) {
+           videoUrl = videoData.hls_link;
+        } else if (videoData.url) {
+           videoUrl = videoData.url;
+        }
+      }
+      
+      openMediaModal(videoUrl, type);
+    } catch (err) {
+      alert('Failed to load secure video link.');
+      console.error(err);
+    } finally {
+      if (loader) loader.style.display = 'none';
+      if (title) title.style.opacity = '1';
+    }
+    return;
+  }
+  
+  if (type === 'DOCUMENT' || type === 'PDF') {
     if (url) {
       openMediaModal(url, type);
     } else {
