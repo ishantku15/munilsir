@@ -463,8 +463,13 @@ window.handleContentClick = async function(el, courseId, itemId, type, url) {
 
       let videoUrl = url;
       
-      if (data && data.success && data.url) {
-        videoUrl = data.url;
+      if (data && data.success) {
+        if (data.isToken) {
+          // Send it to our custom spoofed proxy player
+          videoUrl = `/api/player?type=VIDEO&token=${data.token}`;
+        } else if (data.url) {
+          videoUrl = data.url;
+        }
       }
       
       openMediaModal(videoUrl, type);
@@ -480,7 +485,16 @@ window.handleContentClick = async function(el, courseId, itemId, type, url) {
   
   if (type === 'DOCUMENT' || type === 'PDF') {
     if (url) {
-      openMediaModal(url, type);
+      let docUrl = url;
+      // If it's a token link, feed it through our proxy to bypass Referer blocks
+      if (url.includes('token=')) {
+        const urlParams = new URLSearchParams(url.split('?')[1]);
+        const token = urlParams.get('token');
+        if (token) {
+          docUrl = `/api/player?type=PDF&token=${token}`;
+        }
+      }
+      openMediaModal(docUrl, type);
     } else {
       alert('Content URL not found. It might be encrypted or live class.');
     }

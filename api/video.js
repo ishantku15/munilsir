@@ -25,22 +25,26 @@ export default async function handler(req, res) {
     if (data && data.download_links && data.download_links.length > 0) {
       const encryptedStr = data.download_links[0].path;
       if (encryptedStr.includes(':')) {
-        const parts = encryptedStr.split(':');
-        const cipherText = parts[0];
-        const keyB64 = parts[1];
-        
-        // Double base64 encoded IV
-        const ivDoubleB64 = data.iv_string;
-        const ivB64 = Buffer.from(ivDoubleB64, 'base64').toString('utf8');
-        
-        const keyBuf = Buffer.from(keyB64, 'base64');
-        const ivBuf = Buffer.from(ivB64, 'base64');
+        try {
+          const parts = encryptedStr.split(':');
+          const cipherText = parts[0];
+          const keyB64 = parts[1];
+          
+          // Double base64 encoded IV
+          const ivDoubleB64 = data.iv_string;
+          const ivB64 = Buffer.from(ivDoubleB64, 'base64').toString('utf8');
+          
+          const keyBuf = Buffer.from(keyB64, 'base64');
+          const ivBuf = Buffer.from(ivB64, 'base64');
 
-        const decipher = crypto.createDecipheriv('aes-128-cbc', keyBuf, ivBuf);
-        let decrypted = decipher.update(cipherText, 'base64', 'utf8');
-        decrypted += decipher.final('utf8');
+          const decipher = crypto.createDecipheriv('aes-128-cbc', keyBuf, ivBuf);
+          let decrypted = decipher.update(cipherText, 'base64', 'utf8');
+          decrypted += decipher.final('utf8');
 
-        return res.status(200).json({ success: true, url: decrypted });
+          return res.status(200).json({ success: true, url: decrypted });
+        } catch (e) {
+          console.error("Decryption failed", e);
+        }
       }
       
       // Fallback if not encrypted
@@ -49,6 +53,11 @@ export default async function handler(req, res) {
 
     if (data && data.hls_link) {
        return res.status(200).json({ success: true, url: data.hls_link });
+    }
+    
+    // Fallback to secure player token if no direct links
+    if (data && data.video_player_token) {
+       return res.status(200).json({ success: true, isToken: true, token: data.video_player_token });
     }
 
     res.status(404).json({ error: 'No video links found' });
