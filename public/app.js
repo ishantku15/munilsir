@@ -416,9 +416,9 @@ function renderFolders(courseId, items, parentEl = null) {
   const listEl = parentEl || document.getElementById('rootFolders');
   
   const html = items.map((item, i) => {
-    const isFolder = item.type === 0;
-    const isVideo = item.type === 1;
-    const isPdf = item.type === 2;
+    const isFolder = item.material_type === 'FOLDER';
+    const isVideo = item.material_type === 'VIDEO';
+    const isPdf = item.material_type === 'DOCUMENT' || item.material_type === 'PDF';
     
     let icon = icons.link;
     if (isFolder) icon = icons.folder;
@@ -428,10 +428,10 @@ function renderFolders(courseId, items, parentEl = null) {
     // We store data-course and data-id to fetch sub-folders
     return `
       <div class="content-item" style="animation-delay:${i*20}ms" 
-           onclick="handleContentClick(this, '${courseId}', '${item.id}', ${item.type}, '${item.url || ''}')">
+           onclick="handleContentClick(this, '${courseId}', '${item.id}', '${item.material_type}', '${item.url || item.file_link || item.pdf_link || ''}')">
         <div class="content-icon ${isFolder ? 'folder' : ''}">${icon}</div>
         <div class="content-details" style="flex:1">
-          <span class="content-title" style="display:block">${esc(item.name || item.title || 'Untitled')}</span>
+          <span class="content-title" style="display:block">${esc(item.Title || item.name || item.title || 'Untitled')}</span>
           ${isVideo && item.duration ? `<span class="content-meta" style="font-size:12px;color:#888">${item.duration}</span>` : ''}
         </div>
         <span class="content-meta loader-icon" style="display:none">⌛</span>
@@ -449,7 +449,7 @@ function renderFolders(courseId, items, parentEl = null) {
 }
 
 window.handleContentClick = async function(el, courseId, itemId, type, url) {
-  if (type === 1 || type === 2) {
+  if (type === 'VIDEO' || type === 'DOCUMENT' || type === 'PDF') {
     // It's a video or PDF, open it
     if (url) {
       window.open(url, '_blank');
@@ -459,7 +459,7 @@ window.handleContentClick = async function(el, courseId, itemId, type, url) {
     return;
   }
 
-  // It's a folder (type 0)
+  // It's a folder
   const subDiv = document.getElementById(`sub-${itemId}`);
   const loader = el.querySelector('.loader-icon');
   const chevron = el.querySelector('.chevron');
