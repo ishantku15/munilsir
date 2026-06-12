@@ -428,7 +428,7 @@ function renderFolders(courseId, items, parentEl = null) {
     // We store data-course and data-id to fetch sub-folders
     return `
       <div class="content-item" style="animation-delay:${i*20}ms" 
-           onclick="handleContentClick(this, '${courseId}', '${item.id}', '${item.material_type}', '${item.url || item.file_link || item.pdf_link || ''}')">
+           onclick="handleContentClick(this, '${courseId}', '${item.id}', '${item.material_type}', '${item.video_player_url || item.url || item.file_link || item.pdf_link || ''}')">
         <div class="content-icon ${isFolder ? 'folder' : ''}">${icon}</div>
         <div class="content-details" style="flex:1">
           <span class="content-title" style="display:block">${esc(item.Title || item.name || item.title || 'Untitled')}</span>
